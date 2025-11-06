@@ -52,3 +52,6 @@ class HanabiGame:
         self.clues -= 1
         # Logique pour donner un indice (à implémenter selon vos besoins)
         return True
+    
+        # Todo
+        
