@@ -6,7 +6,8 @@ from .card import Card
 class Player:
     def __init__(self, name: str):
         self.name = name
-        self.hand: List[Card] = []
+        self.hand = []
+
 
     def add_card(self, card: Card):
         self.hand.append(card)

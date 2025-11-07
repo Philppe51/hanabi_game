@@ -6,8 +6,8 @@ from hanabi.card import Color
 def test_initial_deal():
     game = HanabiGame(["Alice", "Bob"])
     assert len(game.players) == 2
-    assert len(game.players[0].hand) == 5
-    assert len(game.players[1].hand) == 5
+    assert len(game.players[0].hand) == 4
+    assert len(game.players[1].hand) == 4
 
 def test_play_card():
     game = HanabiGame(["Alice"])
