@@ -2,14 +2,27 @@
 
 from typing import List, Optional, Tuple
 from enum import Enum
-from typing import List
+from typing import List, Dict, Set, Optional
 from .deck import Deck
 from .player import Player
 from .card import Card, Color
 
+from dataclasses import dataclass
+
+
 class ClueType(Enum):
     COLOR = "color"
     VALUE = "value"
+
+@dataclass
+class ClueRecord:
+    giver_index: int
+    receiver_index: int
+    clue_type: ClueType
+    value: Optional[str]
+    color: Optional[Color]
+    affected_indices: List[int]  # Indices des cartes concernées dans la main du receveur
+    turn: int  # Numéro du tour (pour suivre l'ordre chronologique)
 
 class Clue:
     def __init__(self, clue_type: ClueType, value: Optional[str], color: Optional[Color]):
@@ -74,15 +87,34 @@ class HanabiGame:
         self.discard_pile.append(card)
         self.clues += 1
 
-    def give_clue(self, giver_index: int, receiver_index: int, clue_type: ClueType, value: str = None, color: Color = None) -> bool:
+    def give_clue(self, giver_index: int, 
+                  receiver_index: int, 
+                  clue_type: ClueType, 
+                  value: str = None, 
+                  color: Color = None) -> bool:
+        
         if self.clues_available <= 0:
             return False
 
         receiver = self.players[receiver_index]
         clue = Clue(clue_type, value, color)
-        affected_indices = clue.apply_to_player(receiver)
+        affected_cards = []
+
+        # Trouve les cartes concernées par l'indice
+        for card in receiver.hand:
+            if (clue_type == ClueType.COLOR and card.color == color) or \
+            (clue_type == ClueType.VALUE and str(card.value) == value):
+                affected_cards.append(card)
+
+        # Ajoute l'indice aux cartes concernées
+        for card in affected_cards:
+            if clue_type == ClueType.COLOR:
+                card.add_clue("couleur", color.name)
+            else:
+                card.add_clue("valeur", value)
 
         # Stocke l'indice dans l'historique
+        affected_indices = [receiver.hand.index(card) for card in affected_cards]
         self.clues_history.append(ClueRecord(
             giver_index=giver_index,
             receiver_index=receiver_index,
@@ -93,17 +125,9 @@ class HanabiGame:
             turn=self.turn_count
         ))
 
-        # Stocke l'indice sur le joueur receveur
-        if not hasattr(receiver, 'clues'):
-            receiver.clues = [[] for _ in range(len(receiver.hand))]
-        for idx in affected_indices:
-            if clue_type == ClueType.COLOR:
-                receiver.clues[idx].append(("couleur", color.name))
-            else:
-                receiver.clues[idx].append(("valeur", value))
-
         self.clues_available -= 1
         return True
+
 
     def discard_card(self, player_index: int, card_index: int):
         player = self.players[player_index]

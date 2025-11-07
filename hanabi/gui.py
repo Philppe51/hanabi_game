@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox, simpledialog
-from typing import List
+from typing import List, Optional
 from hanabi.game import HanabiGame, ClueType, Color
 
 class HanabiGUI:
@@ -17,7 +17,7 @@ class HanabiGUI:
             frame.pack(pady=5, padx=10, fill="x")
             self.player_frames.append(frame)
 
-        # Frame pour le plateau (cartes jouées, défaussées, etc.)
+        # Frame pour le plateau
         self.board_frame = tk.LabelFrame(self.window, text="Plateau de jeu")
         self.board_frame.pack(pady=10, padx=10, fill="x")
 
@@ -25,9 +25,13 @@ class HanabiGUI:
         self.action_frame = tk.LabelFrame(self.window, text="Actions")
         self.action_frame.pack(pady=10, padx=10, fill="x")
 
-        # Frame pour l'historique des indices
-        self.clues_frame = tk.LabelFrame(self.window, text="Historique des indices")
-        self.clues_frame.pack(pady=10, padx=10, fill="x")
+        # Frame pour les indices reçus
+        self.received_clues_frame = tk.LabelFrame(self.window, text="Indices reçus")
+        self.received_clues_frame.pack(pady=10, padx=10, fill="x")
+
+        # Frame pour les indices donnés
+        self.given_clues_frame = tk.LabelFrame(self.window, text="Indices donnés")
+        self.given_clues_frame.pack(pady=10, padx=10, fill="x")
 
         # Bouton pour passer au tour suivant
         self.next_turn_button = tk.Button(self.action_frame, text="Terminer le tour", command=self.next_turn)
@@ -47,7 +51,9 @@ class HanabiGUI:
         for widget in self.action_frame.winfo_children():
             if widget != self.next_turn_button:
                 widget.destroy()
-        for widget in self.clues_frame.winfo_children():
+        for widget in self.received_clues_frame.winfo_children():
+            widget.destroy()
+        for widget in self.given_clues_frame.winfo_children():
             widget.destroy()
 
         # Affiche les cartes de chaque joueur
@@ -59,7 +65,7 @@ class HanabiGUI:
                 card_frame = tk.Frame(frame, bd=2, relief="groove")
                 card_frame.grid(row=0, column=j, padx=2)
 
-                # Affiche la carte cachée ou visible selon le joueur
+                # Affiche la carte cachée ou visible
                 if is_current_player:
                     tk.Label(card_frame, text="[Carte]", width=8, height=4, bg="lightgrey").pack()
                 else:
@@ -70,32 +76,43 @@ class HanabiGUI:
                     tk.Button(card_frame, text="Jouer", command=lambda idx=j: self.play_card(idx)).pack(side="left", padx=1)
                     tk.Button(card_frame, text="Défausser", command=lambda idx=j: self.discard_card(idx)).pack(side="right", padx=1)
 
-                # Affiche les indices sur cette carte (si disponibles)
-                if hasattr(player, 'clues') and j in player.clues:
-                    for clue_type, clue_value in player.clues[j]:
-                        clue_text = f"{clue_type}: {clue_value}"
-                        tk.Label(card_frame, text=clue_text, fg="red", font=("Arial", 8)).pack()
+                # Affiche les indices de cette carte
+                for clue in card.clues:
+                    clue_text = f"{clue[0]}: {clue[1]}"
+                    tk.Label(card_frame, text=clue_text, fg="red", font=("Arial", 8)).pack()
 
-        # Affiche les cartes jouées et défaussées
+        # Affiche les cartes jouées, défaussées, et les compteurs
         played_cards_text = ", ".join([f"{color.name}: {value}" for color, value in self.game.played_cards.items()])
         tk.Label(self.board_frame, text=f"Cartes jouées: {played_cards_text}").grid(row=0, column=0, padx=5)
         tk.Label(self.board_frame, text=f"Cartes défaussées: {len(self.game.discard_pile)}").grid(row=0, column=1, padx=5)
-        tk.Label(self.board_frame, text=f"Indices restants: {self.game.clues_available}").grid(row=0, column=2, padx=5)
+        self.clues_label = tk.Label(self.board_frame, text=f"Indices restants: {self.game.clues_available}")
+        self.clues_label.grid(row=0, column=2, padx=5)
         tk.Label(self.board_frame, text=f"Vies restantes: {self.game.lives}").grid(row=0, column=3, padx=5)
 
         # Boutons pour donner un indice (choix du joueur cible)
         tk.Label(self.action_frame, text="Donner un indice à:").grid(row=1, column=0, pady=5)
         for i, player in enumerate(self.game.players):
-            if i != self.current_player_index:  # On ne peut pas se donner un indice à soi-même
+            if i != self.current_player_index:
                 tk.Button(self.action_frame, text=player.name,
                           command=lambda idx=i: self.choose_clue_type(idx)).grid(row=1, column=i+1, padx=5)
 
-        # Affiche l'historique des indices
-        for i, clue in enumerate(self.game.clues_history):
-            giver = self.game.players[clue.giver_index].name
-            receiver = self.game.players[clue.receiver_index].name
-            clue_desc = f"{clue.clue_type.name}: {clue.value if clue.clue_type == ClueType.VALUE else clue.color.name}"
-            tk.Label(self.clues_frame, text=f"Tour {clue.turn}: {giver} → {receiver}: {clue_desc}").grid(row=i, column=0, sticky="w")
+        # Affiche les indices reçus par le joueur actuel
+        current_player = self.game.players[self.current_player_index]
+        if hasattr(current_player, 'clues'):
+            tk.Label(self.received_clues_frame, text="Indices sur vos cartes:").pack(anchor="w")
+            for card_idx, clues in enumerate(current_player.clues):
+                if clues:
+                    clues_text = f"Carte {card_idx + 1}: " + ", ".join([f"{c[0]}={c[1]}" for c in clues])
+                    tk.Label(self.received_clues_frame, text=clues_text, fg="blue").pack(anchor="w")
+
+        # Affiche les indices donnés par le joueur actuel
+        given_clues = [clue for clue in self.game.clues_history if clue.giver_index == self.current_player_index]
+        if given_clues:
+            tk.Label(self.given_clues_frame, text="Indices que vous avez donnés:").pack(anchor="w")
+            for clue in given_clues:
+                receiver = self.game.players[clue.receiver_index].name
+                clue_desc = f"{clue.clue_type.name}: {clue.value if clue.clue_type == ClueType.VALUE else clue.color.name}"
+                tk.Label(self.given_clues_frame, text=f"À {receiver}: {clue_desc} (cartes: {clue.affected_indices})", fg="green").pack(anchor="w")
 
     def choose_clue_type(self, target_player_index: int):
         """Ouvre une fenêtre pour choisir le type d'indice à donner."""
@@ -104,7 +121,6 @@ class HanabiGUI:
 
         tk.Label(clue_window, text="Type d'indice:").pack(pady=5)
 
-        # Boutons pour choisir le type d'indice
         tk.Button(clue_window, text="Indice de couleur",
                   command=lambda: self.choose_clue_value(ClueType.COLOR, target_player_index, clue_window)).pack(pady=2)
         tk.Button(clue_window, text="Indice de valeur",
@@ -135,6 +151,7 @@ class HanabiGUI:
 
         if self.game.give_clue(self.current_player_index, target_player_index, clue_type, value, color):
             messagebox.showinfo("Résultat", "Indice donné avec succès.")
+            self.clues_label.config(text=f"Indices restants: {self.game.clues_available}")
         else:
             messagebox.showinfo("Résultat", "Plus d'indices disponibles.")
         self.update_display()
@@ -157,11 +174,13 @@ class HanabiGUI:
         """Défausse la carte à l'index donné."""
         self.game.discard_card(self.current_player_index, card_index)
         messagebox.showinfo("Résultat", "Carte défaussée. Un indice a été regagné.")
+        self.clues_label.config(text=f"Indices restants: {self.game.clues_available}")
         # Pioche une nouvelle carte
         if self.game.deck.cards:
             new_card = self.game.deck.draw()
             self.game.players[self.current_player_index].add_card(new_card)
         self.update_display()
+
 
     def next_turn(self):
         """Passe au joueur suivant."""
